@@ -7,4 +7,5 @@ dependencies = [
     "boto3>=1.44.9",
     "pyaudio>=0.2.14",
     "smithy-aws-core>=0.0.1",
+    "tzdata>=2026.6",
 ]

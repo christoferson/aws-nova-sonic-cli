@@ -100,7 +100,7 @@ class BedrockStreamManager:
                     "audioType": "SPEECH",
                 },
                 "toolUseOutputConfiguration": {"mediaType": "application/json"},
-                "toolConfiguration": {"tools": []},
+                "toolConfiguration": self.tool_configuration(),
             }
         })
         await self.send_event({
@@ -126,6 +126,12 @@ class BedrockStreamManager:
 
         self.response_task = asyncio.create_task(self._process_responses())
         debug_print("Stream initialized")
+
+    def tool_configuration(self):
+        return {"tools": []}
+
+    async def on_event(self, event_type, event):
+        """Hook for subclasses; called after built-in handling of every response event."""
 
     async def send_event(self, event):
         if not self.is_active:
@@ -231,6 +237,8 @@ class BedrockStreamManager:
 
                 elif event_type is not None:
                     debug_print(f"Received {event_type}")
+
+                await self.on_event(event_type, event)
         except asyncio.CancelledError:
             raise
         except Exception as e:
@@ -342,11 +350,33 @@ class AudioStreamer:
         await self.stream_manager.close()
 
 
+def build_parser(description):
+    parser = build_arg_parser(description)
+    parser.add_argument("--debug", action="store_true", help="Print event-level debug logging")
+    return parser
+
+
+async def run_conversation(stream_manager):
+    """Stream mic audio and play responses until Enter, Ctrl+C, or the server ends the session."""
+    await stream_manager.initialize_stream()
+    audio_streamer = AudioStreamer(stream_manager)
+    enter_task = None
+    try:
+        await audio_streamer.start()
+        enter_task = asyncio.create_task(wait_for_enter())
+        await asyncio.wait([enter_task, stream_manager.response_task], return_when=asyncio.FIRST_COMPLETED)
+    except asyncio.CancelledError:
+        print("\nInterrupted, shutting down...")
+    finally:
+        if enter_task and not enter_task.done():
+            enter_task.cancel()
+        await audio_streamer.stop()
+        print("Session ended")
+
+
 async def main():
     global DEBUG
-    parser = build_arg_parser("Amazon Nova 2 Sonic speech-to-speech console client with barge-in")
-    parser.add_argument("--debug", action="store_true", help="Print event-level debug logging")
-    args = parser.parse_args()
+    args = build_parser("Amazon Nova 2 Sonic speech-to-speech console client with barge-in").parse_args()
     DEBUG = args.debug
 
     if args.list_voices:
@@ -356,29 +386,13 @@ async def main():
     session = boto3.Session(profile_name=args.profile)
     print(f"Using AWS profile '{session.profile_name}' in region {args.region}, voice '{args.voice}'")
 
-    stream_manager = BedrockStreamManager(
+    await run_conversation(BedrockStreamManager(
         session=session,
         model_id=args.model_id,
         region=args.region,
         voice_id=args.voice,
         system_prompt=args.system_prompt,
-    )
-    await stream_manager.initialize_stream()
-
-    audio_streamer = AudioStreamer(stream_manager)
-    enter_task = None
-    try:
-        await audio_streamer.start()
-        enter_task = asyncio.create_task(wait_for_enter())
-        # Stop on Enter, or if the server closes the stream (e.g. session time limit).
-        await asyncio.wait([enter_task, stream_manager.response_task], return_when=asyncio.FIRST_COMPLETED)
-    except asyncio.CancelledError:
-        print("\nInterrupted, shutting down...")
-    finally:
-        if enter_task and not enter_task.done():
-            enter_task.cancel()
-        await audio_streamer.stop()
-        print("Session ended")
+    ))
 
 
 if __name__ == "__main__":

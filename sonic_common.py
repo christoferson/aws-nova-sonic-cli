@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import os
+import sys
 import threading
 
 import pyaudio
@@ -9,6 +10,9 @@ from aws_sdk_bedrock_runtime.config import Config
 from smithy_aws_core.identity.components import AWSCredentialsIdentity, AWSIdentityProperties
 from smithy_core.aio.interfaces.identity import IdentityResolver
 from smithy_core.exceptions import SmithyIdentityError
+
+# Legacy console code pages (e.g. cp932) can't encode every character the model may output.
+sys.stdout.reconfigure(errors="replace")
 
 DEFAULT_MODEL_ID = "amazon.nova-2-sonic-v1:0"
 DEFAULT_VOICE = "tiffany"
