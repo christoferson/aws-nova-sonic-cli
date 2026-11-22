@@ -1,0 +1,99 @@
+# aws-nova-sonic-cli
+
+Console speech-to-speech AI agent using [Amazon Nova 2 Sonic](https://aws.amazon.com/blogs/aws/introducing-amazon-nova-2-sonic-next-generation-speech-to-speech-model-for-conversational-ai/) on Amazon Bedrock. You speak into your microphone, the model answers out loud, and both transcripts are printed in the terminal.
+
+Based on the AWS sample [`nova_sonic_simple.py`](https://github.com/aws-samples/amazon-ai-samples/blob/main/speech-to-speech/amazon-nova-2-sonic/sample-codes/console-python/nova_sonic_simple.py).
+
+## Prerequisites
+
+- [uv](https://docs.astral.sh/uv/) (installs Python 3.12 for you if it's missing)
+- A microphone and speakers. **Use headphones**, otherwise the model can hear itself and interrupt its own answer.
+- An AWS account with access to the `amazon.nova-2-sonic-v1:0` model in Amazon Bedrock, in a region where it's available (default `us-east-1`).
+- IAM permission `bedrock:InvokeModelWithBidirectionalStream`.
+
+## Setup
+
+```bash
+uv sync
+```
+
+This creates `.venv` with Python 3.12 (pinned in `.python-version`) and installs the dependencies from `uv.lock`.
+
+Without uv, use the pinned `requirements.txt` (Python 3.12+):
+
+```bash
+python -m venv .venv
+.venv/Scripts/activate        # Windows; use `source .venv/bin/activate` on macOS/Linux
+pip install -r requirements.txt
+python nova_sonic_simple.py
+```
+
+After changing dependencies with `uv add`, regenerate it:
+
+```bash
+uv export --format requirements-txt --no-hashes -o requirements.txt
+```
+
+## AWS credentials and region
+
+Credentials are resolved by boto3 from your AWS profile, so no keys need to be pasted into the shell. SSO and assume-role profiles work and are refreshed automatically.
+
+Profile selection: `--profile <name>`, else `$AWS_PROFILE`, else `default`.
+
+For an SSO profile, log in first:
+
+```bash
+aws sso login --profile <your-profile>
+```
+
+Region selection: `--region <region>`, else `$AWS_REGION`, else `us-east-1`. The profile's configured region is **not** used, because Nova 2 Sonic is only available in some regions.
+
+Git Bash:
+
+```bash
+export AWS_PROFILE=<your-profile>
+export AWS_REGION=us-east-1
+```
+
+PowerShell:
+
+```powershell
+$env:AWS_PROFILE="<your-profile>"
+$env:AWS_REGION="us-east-1"
+```
+
+## Run
+
+```bash
+uv run nova_sonic_simple.py
+```
+
+Then start talking. Press **Enter** to end the session.
+
+Options:
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--profile` | `$AWS_PROFILE` or `default` | AWS profile for credentials |
+| `--region` | `$AWS_REGION` or `us-east-1` | Bedrock region |
+| `--model-id` | `amazon.nova-2-sonic-v1:0` | Model ID |
+| `--voice` | `matthew` | Output voice (e.g. `matthew`, `tiffany`, `amy`) |
+| `--system-prompt` | built-in assistant prompt | System prompt text |
+
+Example:
+
+```bash
+uv run nova_sonic_simple.py --voice tiffany --system-prompt "You are a friendly travel guide. Keep answers short."
+```
+
+## Audio format
+
+- Input: 16 kHz, 16-bit, mono LPCM (microphone)
+- Output: 24 kHz, 16-bit, mono LPCM (speakers)
+
+## Troubleshooting
+
+- **`No AWS credentials found for profile`**: the profile name is wrong, or (for SSO) run `aws sso login --profile <name>`.
+- **`AccessDeniedException`**: model access isn't enabled for your account in that region, or the IAM policy lacks `bedrock:InvokeModelWithBidirectionalStream`.
+- **No sound or wrong mic**: the default Windows input/output devices are used; change them in Windows Sound settings.
+- **Model interrupts itself**: use headphones to avoid echo.
