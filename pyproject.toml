@@ -9,3 +9,11 @@ dependencies = [
     "smithy-aws-core>=0.0.1",
     "tzdata>=2026.6",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Installs the shared `sonic` package into the venv so gallery/ scripts can import it.
+[tool.hatch.build.targets.wheel]
+packages = ["sonic"]

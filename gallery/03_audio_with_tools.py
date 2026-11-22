@@ -1,14 +1,21 @@
+"""Step 3: tool use. The model calls Python functions (date/time, weather, calculator) and speaks the results."""
 import asyncio
+import importlib
 import json
 import time
 import uuid
 
 import boto3
 
-import nova_sonic
-from nova_sonic import BedrockStreamManager, build_parser, debug_print, run_conversation
-from sonic_common import print_voices
-from tools import run_tool, tool_specs
+from sonic.common import print_voices
+from sonic.tools import run_tool, tool_specs
+
+# Builds on step 2; importlib because module names can't start with a digit in an import statement.
+barge_in = importlib.import_module("02_audio_with_barge_in")
+BedrockStreamManager = barge_in.BedrockStreamManager
+build_parser = barge_in.build_parser
+debug_print = barge_in.debug_print
+run_conversation = barge_in.run_conversation
 
 TOOL_PROMPT_SUFFIX = (
     " You have tools for the current date and time, the weather, and exact calculations. "
@@ -103,7 +110,7 @@ class ToolUseStreamManager(BedrockStreamManager):
 async def main():
     parser = build_parser("Amazon Nova 2 Sonic speech-to-speech console client with tool use")
     args = parser.parse_args()
-    nova_sonic.DEBUG = args.debug
+    barge_in.DEBUG = args.debug
 
     if args.list_voices:
         print_voices()

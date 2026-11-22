@@ -229,7 +229,8 @@ TOOLS = {
 }
 
 
-def tool_specs():
+def tool_specs(names=None):
+    """Tool definitions for promptStart; `names` limits them to a subset of TOOLS."""
     # Nova Sonic expects inputSchema.json as a JSON string, not an object.
     return [
         {
@@ -240,12 +241,13 @@ def tool_specs():
             }
         }
         for name, tool in TOOLS.items()
+        if names is None or name in names
     ]
 
 
-async def run_tool(name, arguments):
+async def run_tool(name, arguments, names=None):
     """Run a tool by name; always returns a JSON-serializable dict, with 'error' on failure."""
-    tool = TOOLS.get(name)
+    tool = TOOLS.get(name) if names is None or name in names else None
     if tool is None:
         return {"error": f"Unknown tool '{name}'"}
     allowed = tool["schema"]["properties"]

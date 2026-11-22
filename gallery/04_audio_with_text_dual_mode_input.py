@@ -1,4 +1,6 @@
+"""Step 4: dual-mode input. Speak or type (cross-modal input), plus chat history to resume conversations."""
 import asyncio
+import importlib
 import json
 import pathlib
 import threading
@@ -6,10 +8,16 @@ import uuid
 
 import boto3
 
-import nova_sonic
-from nova_sonic import build_parser, debug_print, run_conversation, wait_for_enter_to_stop
-from nova_sonic_tool_use import ToolUseStreamManager
-from sonic_common import print_voices
+from sonic.common import print_voices
+
+# Builds on steps 2 and 3; importlib because module names can't start with a digit in an import statement.
+barge_in = importlib.import_module("02_audio_with_barge_in")
+tool_use = importlib.import_module("03_audio_with_tools")
+build_parser = barge_in.build_parser
+debug_print = barge_in.debug_print
+run_conversation = barge_in.run_conversation
+wait_for_enter_to_stop = barge_in.wait_for_enter_to_stop
+ToolUseStreamManager = tool_use.ToolUseStreamManager
 
 # Limits from https://docs.aws.amazon.com/nova/latest/nova2-userguide/sonic-chat-history.html
 MAX_HISTORY_BYTES = 200_000
@@ -193,7 +201,7 @@ async def main():
         help="Load --history but don't write this conversation back to it",
     )
     args = parser.parse_args()
-    nova_sonic.DEBUG = args.debug
+    barge_in.DEBUG = args.debug
 
     if args.list_voices:
         print_voices()

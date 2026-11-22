@@ -2,16 +2,25 @@
 
 Console speech-to-speech AI agent using [Amazon Nova 2 Sonic](https://aws.amazon.com/blogs/aws/introducing-amazon-nova-2-sonic-next-generation-speech-to-speech-model-for-conversational-ai/) on Amazon Bedrock. You speak into your microphone, the model answers out loud, and both transcripts are printed in the terminal.
 
-Based on the AWS [console-python samples](https://github.com/aws-samples/amazon-ai-samples/tree/main/speech-to-speech/amazon-nova-2-sonic/sample-codes/console-python):
+Based on the AWS [console-python samples](https://github.com/aws-samples/amazon-ai-samples/tree/main/speech-to-speech/amazon-nova-2-sonic/sample-codes/console-python).
 
-| Script | What it shows |
-| --- | --- |
-| `nova_sonic_simple.py` | Minimal speech-to-speech loop: mic in, voice out, transcripts printed |
-| `nova_sonic.py` | Full version with **barge-in** (interrupt the assistant mid-answer), callback-based mic capture, auto-exit when the server ends the session, and `--debug` event logging |
-| `nova_sonic_tool_use.py` | Barge-in version plus **tool use**: the model calls Python functions (date/time, weather, calculator) and speaks the results |
-| `tools.py` | The tool implementations and their JSON schemas |
-| `nova_sonic_with_text.py` | Tool-use version plus **typed input** (speak, type, or both), **chat history** load/save to resume conversations |
-| `sonic_common.py` | Shared code: AWS profile credentials, CLI options, voices, Enter/Ctrl+C handling |
+## Project layout
+
+```
+nova_sonic.py                            Main program: voice assistant with barge-in and tools
+gallery/                                 Feature showcases, in order of difficulty
+  01_audio_plain.py                      Mic in, voice out, transcripts; the whole event protocol in one file
+  02_audio_with_barge_in.py              Interrupt the assistant mid-answer; --debug event logging
+  03_audio_with_tools.py                 Builds on 02: the model calls Python tools and speaks the results
+  04_audio_with_text_dual_mode_input.py  Builds on 03: speak or type, plus chat history to resume conversations
+sonic/                                   Shared package (installed into the venv by uv sync)
+  common.py                              AWS profile credentials, CLI options, voices, default prompt
+  tools.py                               Tool implementations and JSON schemas
+examples/chat_history.json               Sample history for 04
+docs/                                    Offline copies of the Nova 2 Sonic docs
+```
+
+`nova_sonic.py` is standalone, so it can evolve without breaking the gallery. Each gallery step builds on the previous one, so reading them in order is a guided tour of the API.
 
 ## Prerequisites
 
@@ -33,8 +42,8 @@ Without uv, use the pinned `requirements.txt` (Python 3.12+):
 ```bash
 python -m venv .venv
 .venv/Scripts/activate        # Windows; use `source .venv/bin/activate` on macOS/Linux
-pip install -r requirements.txt
-python nova_sonic_simple.py
+pip install -r requirements.txt   # also installs the local `sonic` package
+python nova_sonic.py
 ```
 
 After changing dependencies with `uv add`, regenerate it:
@@ -73,17 +82,25 @@ $env:AWS_REGION="us-east-1"
 
 ## Run
 
+Main program:
+
 ```bash
-uv run nova_sonic_simple.py   # simple
-uv run nova_sonic.py          # with barge-in
-uv run nova_sonic.py --debug  # with event-level logging
-uv run nova_sonic_tool_use.py # with barge-in and tools
-uv run nova_sonic_with_text.py # tools + speak or type, chat history
+uv run nova_sonic.py           # barge-in + tools (date/time, calculator)
+uv run nova_sonic.py --debug   # with event-level logging
+```
+
+Gallery:
+
+```bash
+uv run gallery/01_audio_plain.py
+uv run gallery/02_audio_with_barge_in.py
+uv run gallery/03_audio_with_tools.py
+uv run gallery/04_audio_with_text_dual_mode_input.py
 ```
 
 Then start talking. Press **Enter** (or Ctrl+C) to end the session.
 
-With `nova_sonic.py` you can start speaking while the assistant is talking: it stops immediately, prints `(interrupted)`, and answers your new input. Use headphones so it doesn't interrupt itself.
+From step 02 on, and in `nova_sonic.py`, you can start speaking while the assistant is talking. It stops immediately, prints `(interrupted)`, and answers your new input. Use headphones so it doesn't interrupt itself.
 
 Options (all scripts):
 
@@ -95,7 +112,7 @@ Options (all scripts):
 | `--voice` | `tiffany` | Output voice (see below) |
 | `--list-voices` | | Print available voices and exit |
 | `--system-prompt` | voice assistant prompt | Replace the default prompt. The default tells the model it is speaking out loud, matches its gender to the voice, and has it reply in the language you speak |
-| `--debug` | off | All except `nova_sonic_simple.py`: log events, stop reasons, token usage, tool results |
+| `--debug` | off | All except step 01: log events, stop reasons, token usage, tool results |
 
 Example:
 
@@ -105,7 +122,7 @@ uv run nova_sonic.py --voice matthew --system-prompt "You are a friendly travel 
 
 ## Tools
 
-`nova_sonic_tool_use.py` gives the model three tools, defined in `tools.py`. Each call is printed as `[tool] name(args)` along with how long it took.
+Tools are defined in `sonic/tools.py`. `nova_sonic.py` enables `get_date_and_time` and `calculate` (see `ENABLED_TOOLS`), and gallery steps 03 and 04 enable all three. Each call is printed as `[tool] name(args)` along with how long it took.
 
 | Tool | What it does | Try saying |
 | --- | --- | --- |
@@ -115,11 +132,11 @@ uv run nova_sonic.py --voice matthew --system-prompt "You are a friendly travel 
 
 Tools run in the background, so the model keeps talking ("let me check the weather...") while it waits. This is Nova 2 Sonic's asynchronous tool calling. Every tool call gets a result, even on error, because the model waits for one.
 
-To add a tool, write an async function and add an entry to `TOOLS` in `tools.py` with a description and JSON schema.
+To add a tool, write an async function and add an entry to `TOOLS` in `sonic/tools.py` with a description and JSON schema. To use it in `nova_sonic.py`, add its name to `ENABLED_TOOLS`.
 
 ## Text input and chat history
 
-`nova_sonic_with_text.py` includes the tools above and adds Nova 2 Sonic's cross-modal input. You can type messages as well as speak, and the assistant always answers out loud.
+`gallery/04_audio_with_text_dual_mode_input.py` includes the tools above and adds Nova 2 Sonic's cross-modal input. You can type messages as well as speak, and the assistant always answers out loud.
 
 | Flag | Default | Description |
 | --- | --- | --- |
@@ -132,14 +149,14 @@ In `mixed` and `text` modes, type a message and press Enter to send it. Type `/q
 Keep one conversation going across sessions by passing the same file every time:
 
 ```bash
-uv run nova_sonic_with_text.py --history chat.json   # first run creates chat.json on exit
-uv run nova_sonic_with_text.py --history chat.json   # later runs remember it, then append to it
+uv run gallery/04_audio_with_text_dual_mode_input.py --history chat.json   # first run creates chat.json on exit
+uv run gallery/04_audio_with_text_dual_mode_input.py --history chat.json   # later runs remember it, then append to it
 ```
 
 Try the bundled example without modifying it:
 
 ```bash
-uv run nova_sonic_with_text.py --history examples/chat_history.json --no-save   # ask "what's my name?"
+uv run gallery/04_audio_with_text_dual_mode_input.py --history examples/chat_history.json --no-save   # ask "what's my name?"
 ```
 
 The history file is a JSON list of `{"role": "USER" | "ASSISTANT", "content": "..."}` messages. Consecutive messages from the same role are merged, because history must alternate. The file keeps everything. If it grows past Nova Sonic's 200KB limit, only the newest messages are sent to the model. The saved transcript uses the model's final assistant text plus your recognized speech or typed messages.

@@ -28,4 +28,4 @@ Local Markdown copies of the Amazon Nova 2 Sonic documentation, saved 2026-11-22
 
 ## Sample code
 
-`nova_sonic_simple.py` in the repo root is based on the AWS sample [`nova_sonic_simple.py`](https://github.com/aws-samples/amazon-ai-samples/blob/main/speech-to-speech/amazon-nova-2-sonic/sample-codes/console-python/nova_sonic_simple.py).
+The scripts in `gallery/` and the main `nova_sonic.py` are based on the AWS [console-python samples](https://github.com/aws-samples/amazon-ai-samples/tree/main/speech-to-speech/amazon-nova-2-sonic/sample-codes/console-python).

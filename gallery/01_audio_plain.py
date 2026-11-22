@@ -1,3 +1,4 @@
+"""Step 1: basic speech-to-speech. Mic in, voice out, transcripts printed; the full event protocol in one file."""
 import asyncio
 import base64
 import json
@@ -11,7 +12,7 @@ from aws_sdk_bedrock_runtime.models import (
     InvokeModelWithBidirectionalStreamInputChunk,
 )
 
-from sonic_common import (
+from sonic.common import (
     CHANNELS,
     DEFAULT_MODEL_ID,
     DEFAULT_VOICE,
