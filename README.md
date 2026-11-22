@@ -12,7 +12,7 @@ gallery/                                 Feature showcases, in order of difficul
   01_audio_plain.py                      Mic in, voice out, transcripts; the whole event protocol in one file
   02_audio_with_barge_in.py              Interrupt the assistant mid-answer; --debug event logging
   03_audio_with_tools.py                 Builds on 02: the model calls Python tools and speaks the results
-  04_audio_with_text_dual_mode_input.py  Builds on 03: speak or type, plus chat history to resume conversations
+  04_audio_with_text_dual_mode_input.py  Builds on 03: speak or type, chat history; tools off unless --tools
 sonic/                                   Shared package (installed into the venv by uv sync)
   common.py                              AWS profile credentials, CLI options, voices, default prompt
   tools.py                               Tool implementations and JSON schemas
@@ -136,13 +136,14 @@ To add a tool, write an async function and add an entry to `TOOLS` in `sonic/too
 
 ## Text input and chat history
 
-`gallery/04_audio_with_text_dual_mode_input.py` includes the tools above and adds Nova 2 Sonic's cross-modal input. You can type messages as well as speak, and the assistant always answers out loud.
+`gallery/04_audio_with_text_dual_mode_input.py` adds Nova 2 Sonic's cross-modal input. The tools above are off by default; pass `--tools` to enable them. You can type messages as well as speak, and the assistant always answers out loud.
 
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--mode` | `mixed` | `mixed`: speak or type. `text`: type only, no microphone. `audio`: speak only |
 | `--history FILE` | | Chat history file. Loaded at start if it exists (so the model remembers it), and this conversation is appended to it on exit |
 | `--no-save` | off | Load `--history` but leave the file unchanged |
+| `--tools` | off | Enable the date/time, weather and calculator tools from step 03 |
 
 In `mixed` and `text` modes, type a message and press Enter to send it. Type `/quit` or press Ctrl+C to end. In `text` mode the script streams silence instead of microphone audio, because the session needs continuous audio input.
 

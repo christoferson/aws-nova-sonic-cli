@@ -8,7 +8,7 @@ import uuid
 
 import boto3
 
-from sonic.common import print_voices
+from sonic.common import default_system_prompt, print_voices
 
 # Builds on steps 2 and 3; importlib because module names can't start with a digit in an import statement.
 barge_in = importlib.import_module("02_audio_with_barge_in")
@@ -76,8 +76,12 @@ def append_message(messages, role, text):
 class TextStreamManager(ToolUseStreamManager):
     """Adds typed (cross-modal) input, chat history replay, and transcript recording."""
 
-    def __init__(self, *args, history=None, **kwargs):
+    def __init__(self, *args, history=None, tools_enabled=False, **kwargs):
         super().__init__(*args, **kwargs)
+        self.tools_enabled = tools_enabled
+        if not tools_enabled and not kwargs.get("system_prompt"):
+            # Drop the tool hint step 03 appended; the model shouldn't mention tools it doesn't have.
+            self.system_prompt = default_system_prompt(self.voice_id)
         self.history = history or []
         if self.history:
             # Without this the model tends to insist it has no memory of earlier sessions.
@@ -85,6 +89,9 @@ class TextStreamManager(ToolUseStreamManager):
         self.transcript = []
         self._transcript_role = None
         self._transcript_stage = None
+
+    def tool_configuration(self):
+        return super().tool_configuration() if self.tools_enabled else {"tools": []}
 
     async def initialize_stream(self):
         await super().initialize_stream()
@@ -196,6 +203,11 @@ async def main():
         help="JSON chat history file: loaded at start if it exists, and updated with this conversation on exit",
     )
     parser.add_argument(
+        "--tools",
+        action="store_true",
+        help="Enable the step 03 tools (date/time, weather, calculator). Off by default",
+    )
+    parser.add_argument(
         "--no-save",
         action="store_true",
         help="Load --history but don't write this conversation back to it",
@@ -220,7 +232,10 @@ async def main():
             print(f"No history in {args.history} yet; it will be created on exit")
 
     session = boto3.Session(profile_name=args.profile)
-    print(f"Using AWS profile '{session.profile_name}' in region {args.region}, voice '{args.voice}', mode '{args.mode}'")
+    print(
+        f"Using AWS profile '{session.profile_name}' in region {args.region}, voice '{args.voice}', "
+        f"mode '{args.mode}', tools {'on' if args.tools else 'off'}"
+    )
 
     stream_manager = TextStreamManager(
         session=session,
@@ -229,6 +244,7 @@ async def main():
         voice_id=args.voice,
         system_prompt=args.system_prompt,
         history=history_for_model(history),
+        tools_enabled=args.tools,
     )
     until = wait_for_enter_to_stop if args.mode == "audio" else make_text_loop(stream_manager, args.mode)
     try:
