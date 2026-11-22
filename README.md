@@ -13,6 +13,7 @@ gallery/                                 Feature showcases, in order of difficul
   02_audio_with_barge_in.py              Interrupt the assistant mid-answer; --debug event logging
   03_audio_with_tools.py                 Builds on 02: the model calls Python tools and speaks the results
   04_audio_with_text_dual_mode_input.py  Builds on 03: speak or type, chat history; tools off unless --tools
+  05_audio_with_turn_taking.py           Builds on 02: set how long a pause ends your turn, and time each reply
 sonic/                                   Shared package (installed into the venv by uv sync)
   common.py                              AWS profile credentials, CLI options, voices, default prompt
   tools.py                               Tool implementations and JSON schemas
@@ -96,6 +97,7 @@ uv run gallery/01_audio_plain.py
 uv run gallery/02_audio_with_barge_in.py
 uv run gallery/03_audio_with_tools.py
 uv run gallery/04_audio_with_text_dual_mode_input.py
+uv run gallery/05_audio_with_turn_taking.py --sensitivity HIGH
 ```
 
 Then start talking. Press **Enter** (or Ctrl+C) to end the session.
@@ -163,6 +165,18 @@ uv run gallery/04_audio_with_text_dual_mode_input.py --history examples/chat_his
 The history file is a JSON list of `{"role": "USER" | "ASSISTANT", "content": "..."}` messages. Consecutive messages from the same role are merged, because history must alternate. The file keeps everything. If it grows past Nova Sonic's 200KB limit, only the newest messages are sent to the model. The saved transcript uses the model's final assistant text plus your recognized speech or typed messages.
 
 If you see `(interrupted)` after most answers when you didn't interrupt, the microphone is probably picking up the assistant's voice from your speakers. Use headphones.
+
+## Turn-taking sensitivity
+
+`gallery/05_audio_with_turn_taking.py` sets `endpointingSensitivity`, which controls how long a pause Nova Sonic waits for before it decides you've finished speaking and answers.
+
+| `--sensitivity` | Pause before answering | Good for |
+| --- | --- | --- |
+| `HIGH` | ~1.5 s | Quick Q&A and commands; may cut in if you pause mid-sentence |
+| `MEDIUM` (default) | ~1.75 s | General conversation |
+| `LOW` | ~2.0 s | People who pause to think |
+
+After each reply starts, it prints `[turn] reply started 1.9s after you stopped speaking`. That time is the pause plus model and network latency. It's estimated from mic loudness, so use headphones in a quiet room. If background noise skews it, raise `SPEECH_RMS_THRESHOLD` in the script.
 
 ## Voices
 
