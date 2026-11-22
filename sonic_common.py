@@ -42,12 +42,20 @@ VOICES = {
     "leo": "pt-BR, masculine",
 }
 
-DEFAULT_SYSTEM_PROMPT = (
-    "You are a warm, professional, and helpful AI assistant. Give accurate answers that "
-    "sound natural, direct, and human. Start by answering the user's question clearly in 1-2 "
-    "sentences. Then, expand only enough to make the answer understandable, staying within 3-5 "
-    "short sentences total. Avoid sounding like a lecture or essay."
-)
+
+def default_system_prompt(voice_id=DEFAULT_VOICE):
+    # Based on https://docs.aws.amazon.com/nova/latest/nova2-userguide/sonic-system-prompts.html
+    # Gender must match the voice for languages with gender agreement (French, Hindi, Spanish, ...).
+    gender = "female" if "feminine" in VOICES.get(voice_id, "") else "male"
+    return (
+        f"You are a warm, professional, and helpful {gender} AI voice assistant. "
+        "You are talking with the user out loud in real time: they hear your voice and you hear theirs. "
+        "Give accurate answers that sound natural, direct, and human. Start by answering the user's "
+        "question clearly in 1-2 sentences. Then, expand only enough to make the answer understandable, "
+        "staying within 3-5 short sentences total. Avoid sounding like a lecture or essay. "
+        "Always reply in the language the user is speaking, and do not mix in English unless the user "
+        "speaks English."
+    )
 
 
 class Boto3CredentialsResolver(IdentityResolver[AWSCredentialsIdentity, AWSIdentityProperties]):
@@ -96,7 +104,10 @@ def build_arg_parser(description):
         help=f"Output voice ID (default: {DEFAULT_VOICE}). See --list-voices",
     )
     parser.add_argument("--list-voices", action="store_true", help="List available voices and exit")
-    parser.add_argument("--system-prompt", default=DEFAULT_SYSTEM_PROMPT)
+    parser.add_argument(
+        "--system-prompt",
+        help="Replace the default prompt (a voice assistant matching the voice's gender, replying in the user's language)",
+    )
     return parser
 
 

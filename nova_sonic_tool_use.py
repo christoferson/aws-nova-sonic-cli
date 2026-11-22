@@ -7,10 +7,10 @@ import boto3
 
 import nova_sonic
 from nova_sonic import BedrockStreamManager, build_parser, debug_print, run_conversation
-from sonic_common import DEFAULT_SYSTEM_PROMPT, print_voices
+from sonic_common import print_voices
 from tools import run_tool, tool_specs
 
-TOOL_SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT + (
+TOOL_PROMPT_SUFFIX = (
     " You have tools for the current date and time, the weather, and exact calculations. "
     "Use them instead of guessing. While a tool is running, briefly tell the user what you are checking."
 )
@@ -20,7 +20,10 @@ class ToolUseStreamManager(BedrockStreamManager):
     """Adds tool use: answers each toolUse event by running the tool in the background."""
 
     def __init__(self, *args, **kwargs):
+        custom_prompt = kwargs.get("system_prompt")
         super().__init__(*args, **kwargs)
+        if not custom_prompt:
+            self.system_prompt += TOOL_PROMPT_SUFFIX
         self.pending_tool_uses = {}
         self.tool_tasks = set()
         # Each result is three events; results of concurrent tools must not interleave.
@@ -99,7 +102,6 @@ class ToolUseStreamManager(BedrockStreamManager):
 
 async def main():
     parser = build_parser("Amazon Nova 2 Sonic speech-to-speech console client with tool use")
-    parser.set_defaults(system_prompt=TOOL_SYSTEM_PROMPT)
     args = parser.parse_args()
     nova_sonic.DEBUG = args.debug
 

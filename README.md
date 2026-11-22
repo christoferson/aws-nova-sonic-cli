@@ -10,6 +10,7 @@ Based on the AWS [console-python samples](https://github.com/aws-samples/amazon-
 | `nova_sonic.py` | Full version with **barge-in** (interrupt the assistant mid-answer), callback-based mic capture, auto-exit when the server ends the session, and `--debug` event logging |
 | `nova_sonic_tool_use.py` | Barge-in version plus **tool use**: the model calls Python functions (date/time, weather, calculator) and speaks the results |
 | `tools.py` | The tool implementations and their JSON schemas |
+| `nova_sonic_with_text.py` | Tool-use version plus **typed input** (speak, type, or both), **chat history** load/save to resume conversations |
 | `sonic_common.py` | Shared code: AWS profile credentials, CLI options, voices, Enter/Ctrl+C handling |
 
 ## Prerequisites
@@ -77,6 +78,7 @@ uv run nova_sonic_simple.py   # simple
 uv run nova_sonic.py          # with barge-in
 uv run nova_sonic.py --debug  # with event-level logging
 uv run nova_sonic_tool_use.py # with barge-in and tools
+uv run nova_sonic_with_text.py # tools + speak or type, chat history
 ```
 
 Then start talking. Press **Enter** (or Ctrl+C) to end the session.
@@ -92,8 +94,8 @@ Options (all scripts):
 | `--model-id` | `amazon.nova-2-sonic-v1:0` | Model ID |
 | `--voice` | `tiffany` | Output voice (see below) |
 | `--list-voices` | | Print available voices and exit |
-| `--system-prompt` | built-in assistant prompt | System prompt text |
-| `--debug` | off | `nova_sonic.py` / `nova_sonic_tool_use.py`: log events, stop reasons, token usage, tool results |
+| `--system-prompt` | voice assistant prompt | Replace the default prompt. The default tells the model it is speaking out loud, matches its gender to the voice, and has it reply in the language you speak |
+| `--debug` | off | All except `nova_sonic_simple.py`: log events, stop reasons, token usage, tool results |
 
 Example:
 
@@ -114,6 +116,35 @@ uv run nova_sonic.py --voice matthew --system-prompt "You are a friendly travel 
 Tools run in the background, so the model keeps talking ("let me check the weather...") while it waits. This is Nova 2 Sonic's asynchronous tool calling. Every tool call gets a result, even on error, because the model waits for one.
 
 To add a tool, write an async function and add an entry to `TOOLS` in `tools.py` with a description and JSON schema.
+
+## Text input and chat history
+
+`nova_sonic_with_text.py` includes the tools above and adds Nova 2 Sonic's cross-modal input. You can type messages as well as speak, and the assistant always answers out loud.
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--mode` | `mixed` | `mixed`: speak or type. `text`: type only, no microphone. `audio`: speak only |
+| `--history FILE` | | Chat history file. Loaded at start if it exists (so the model remembers it), and this conversation is appended to it on exit |
+| `--no-save` | off | Load `--history` but leave the file unchanged |
+
+In `mixed` and `text` modes, type a message and press Enter to send it. Type `/quit` or press Ctrl+C to end. In `text` mode the script streams silence instead of microphone audio, because the session needs continuous audio input.
+
+Keep one conversation going across sessions by passing the same file every time:
+
+```bash
+uv run nova_sonic_with_text.py --history chat.json   # first run creates chat.json on exit
+uv run nova_sonic_with_text.py --history chat.json   # later runs remember it, then append to it
+```
+
+Try the bundled example without modifying it:
+
+```bash
+uv run nova_sonic_with_text.py --history examples/chat_history.json --no-save   # ask "what's my name?"
+```
+
+The history file is a JSON list of `{"role": "USER" | "ASSISTANT", "content": "..."}` messages. Consecutive messages from the same role are merged, because history must alternate. The file keeps everything. If it grows past Nova Sonic's 200KB limit, only the newest messages are sent to the model. The saved transcript uses the model's final assistant text plus your recognized speech or typed messages.
+
+If you see `(interrupted)` after most answers when you didn't interrupt, the microphone is probably picking up the assistant's voice from your speakers. Use headphones.
 
 ## Voices
 

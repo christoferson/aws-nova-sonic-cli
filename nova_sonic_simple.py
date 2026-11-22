@@ -14,13 +14,13 @@ from aws_sdk_bedrock_runtime.models import (
 from sonic_common import (
     CHANNELS,
     DEFAULT_MODEL_ID,
-    DEFAULT_SYSTEM_PROMPT,
     DEFAULT_VOICE,
     FORMAT,
     INPUT_SAMPLE_RATE,
     OUTPUT_SAMPLE_RATE,
     build_arg_parser,
     create_bedrock_client,
+    default_system_prompt,
     print_voices,
     wait_for_enter,
 )
@@ -35,13 +35,13 @@ class SimpleNovaSonic:
         model_id=DEFAULT_MODEL_ID,
         region="us-east-1",
         voice_id=DEFAULT_VOICE,
-        system_prompt=DEFAULT_SYSTEM_PROMPT,
+        system_prompt=None,
     ):
         self.session = session
         self.model_id = model_id
         self.region = region
         self.voice_id = voice_id
-        self.system_prompt = system_prompt
+        self.system_prompt = system_prompt or default_system_prompt(voice_id)
         self.client = None
         self.stream = None
         self.response = None

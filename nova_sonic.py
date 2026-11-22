@@ -16,13 +16,13 @@ from aws_sdk_bedrock_runtime.models import (
 from sonic_common import (
     CHANNELS,
     DEFAULT_MODEL_ID,
-    DEFAULT_SYSTEM_PROMPT,
     DEFAULT_VOICE,
     FORMAT,
     INPUT_SAMPLE_RATE,
     OUTPUT_SAMPLE_RATE,
     build_arg_parser,
     create_bedrock_client,
+    default_system_prompt,
     print_voices,
     wait_for_enter,
 )
@@ -46,13 +46,13 @@ class BedrockStreamManager:
         model_id=DEFAULT_MODEL_ID,
         region="us-east-1",
         voice_id=DEFAULT_VOICE,
-        system_prompt=DEFAULT_SYSTEM_PROMPT,
+        system_prompt=None,
     ):
         self.session = session
         self.model_id = model_id
         self.region = region
         self.voice_id = voice_id
-        self.system_prompt = system_prompt
+        self.system_prompt = system_prompt or default_system_prompt(voice_id)
 
         self.client = None
         self.stream = None
@@ -265,9 +265,9 @@ class BedrockStreamManager:
 
 
 class AudioStreamer:
-    """Streams microphone audio to Bedrock and plays responses, stopping playback on barge-in."""
+    """Streams microphone audio (or silence) to Bedrock and plays responses, stopping playback on barge-in."""
 
-    def __init__(self, stream_manager):
+    def __init__(self, stream_manager, use_microphone=True):
         self.stream_manager = stream_manager
         self.loop = asyncio.get_running_loop()
         self.mic_queue = asyncio.Queue()
@@ -275,15 +275,17 @@ class AudioStreamer:
         self.tasks = []
 
         self.p = pyaudio.PyAudio()
-        self.input_stream = self.p.open(
-            format=FORMAT,
-            channels=CHANNELS,
-            rate=INPUT_SAMPLE_RATE,
-            input=True,
-            frames_per_buffer=CHUNK_SIZE,
-            stream_callback=self._input_callback,
-            start=False,
-        )
+        self.input_stream = None
+        if use_microphone:
+            self.input_stream = self.p.open(
+                format=FORMAT,
+                channels=CHANNELS,
+                rate=INPUT_SAMPLE_RATE,
+                input=True,
+                frames_per_buffer=CHUNK_SIZE,
+                stream_callback=self._input_callback,
+                start=False,
+            )
         self.output_stream = self.p.open(
             format=FORMAT,
             channels=CHANNELS,
@@ -302,6 +304,14 @@ class AudioStreamer:
         while True:
             audio_bytes = await self.mic_queue.get()
             await self.stream_manager.send_audio_chunk(audio_bytes)
+
+    async def _send_silence(self):
+        # The session needs continuous audio even when the user only types; send silence in real time.
+        silence = b"\x00" * (CHUNK_SIZE * 2)
+        interval = CHUNK_SIZE / INPUT_SAMPLE_RATE
+        while True:
+            await self.stream_manager.send_audio_chunk(silence)
+            await asyncio.sleep(interval)
 
     async def _play_output_audio(self):
         manager = self.stream_manager
@@ -325,24 +335,27 @@ class AudioStreamer:
     async def start(self):
         await self.stream_manager.send_audio_content_start()
         self.is_streaming = True
-        self.input_stream.start_stream()
+        if self.input_stream:
+            self.input_stream.start_stream()
+            sender = self._send_mic_audio()
+        else:
+            sender = self._send_silence()
         self.tasks = [
-            asyncio.create_task(self._send_mic_audio()),
+            asyncio.create_task(sender),
             asyncio.create_task(self._play_output_audio()),
         ]
-        print("Starting audio streaming. Speak into your microphone (you can interrupt the assistant)...")
-        print("Press Enter to stop...")
 
     async def stop(self):
         self.is_streaming = False
-        if self.input_stream.is_active():
+        if self.input_stream and self.input_stream.is_active():
             self.input_stream.stop_stream()
 
         for task in self.tasks:
             task.cancel()
         await asyncio.gather(*self.tasks, return_exceptions=True)
 
-        self.input_stream.close()
+        if self.input_stream:
+            self.input_stream.close()
         self.output_stream.stop_stream()
         self.output_stream.close()
         self.p.terminate()
@@ -356,20 +369,26 @@ def build_parser(description):
     return parser
 
 
-async def run_conversation(stream_manager):
-    """Stream mic audio and play responses until Enter, Ctrl+C, or the server ends the session."""
+async def wait_for_enter_to_stop():
+    print("Starting audio streaming. Speak into your microphone (you can interrupt the assistant)...")
+    print("Press Enter to stop...")
+    await wait_for_enter()
+
+
+async def run_conversation(stream_manager, use_microphone=True, until=wait_for_enter_to_stop):
+    """Stream audio and play responses until `until()` returns, Ctrl+C, or the server ends the session."""
     await stream_manager.initialize_stream()
-    audio_streamer = AudioStreamer(stream_manager)
-    enter_task = None
+    audio_streamer = AudioStreamer(stream_manager, use_microphone=use_microphone)
+    until_task = None
     try:
         await audio_streamer.start()
-        enter_task = asyncio.create_task(wait_for_enter())
-        await asyncio.wait([enter_task, stream_manager.response_task], return_when=asyncio.FIRST_COMPLETED)
+        until_task = asyncio.create_task(until())
+        await asyncio.wait([until_task, stream_manager.response_task], return_when=asyncio.FIRST_COMPLETED)
     except asyncio.CancelledError:
         print("\nInterrupted, shutting down...")
     finally:
-        if enter_task and not enter_task.done():
-            enter_task.cancel()
+        if until_task and not until_task.done():
+            until_task.cancel()
         await audio_streamer.stop()
         print("Session ended")
 
