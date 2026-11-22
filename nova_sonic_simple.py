@@ -27,8 +27,28 @@ CHANNELS = 1
 FORMAT = pyaudio.paInt16
 CHUNK_SIZE = 1024
 
+# https://docs.aws.amazon.com/nova/latest/nova2-userguide/sonic-language-support.html
+VOICES = {
+    "matthew": "en-US, masculine, polyglot (speaks all supported languages)",
+    "tiffany": "en-US, feminine, polyglot (speaks all supported languages)",
+    "amy": "en-GB, feminine",
+    "olivia": "en-AU, feminine",
+    "kiara": "en-IN / hi-IN, feminine",
+    "arjun": "en-IN / hi-IN, masculine",
+    "ambre": "fr-FR, feminine",
+    "florian": "fr-FR, masculine",
+    "beatrice": "it-IT, feminine",
+    "lorenzo": "it-IT, masculine",
+    "tina": "de-DE, feminine",
+    "lennart": "de-DE, masculine",
+    "lupe": "es-US, feminine",
+    "carlos": "es-US, masculine",
+    "carolina": "pt-BR, feminine",
+    "leo": "pt-BR, masculine",
+}
+
 DEFAULT_SYSTEM_PROMPT = (
-    "You are a warm, professional, and helpful male AI assistant. Give accurate answers that "
+    "You are a warm, professional, and helpful AI assistant. Give accurate answers that "
     "sound natural, direct, and human. Start by answering the user's question clearly in 1-2 "
     "sentences. Then, expand only enough to make the answer understandable, staying within 3-5 "
     "short sentences total. Avoid sounding like a lecture or essay."
@@ -61,7 +81,7 @@ class SimpleNovaSonic:
         session,
         model_id="amazon.nova-2-sonic-v1:0",
         region="us-east-1",
-        voice_id="matthew",
+        voice_id="tiffany",
         system_prompt=DEFAULT_SYSTEM_PROMPT,
     ):
         self.session = session
@@ -302,15 +322,26 @@ def parse_args():
         help="Bedrock region (defaults to $AWS_REGION, then us-east-1)",
     )
     parser.add_argument("--model-id", default="amazon.nova-2-sonic-v1:0")
-    parser.add_argument("--voice", default="matthew", help="Voice ID, e.g. matthew, tiffany, amy")
+    parser.add_argument(
+        "--voice",
+        default="tiffany",
+        choices=VOICES,
+        metavar="VOICE",
+        help="Output voice ID (default: tiffany). See --list-voices",
+    )
+    parser.add_argument("--list-voices", action="store_true", help="List available voices and exit")
     parser.add_argument("--system-prompt", default=DEFAULT_SYSTEM_PROMPT)
     return parser.parse_args()
 
 
 async def main():
     args = parse_args()
+    if args.list_voices:
+        for voice_id, description in VOICES.items():
+            print(f"{voice_id:<10} {description}")
+        return
     session = boto3.Session(profile_name=args.profile)
-    print(f"Using AWS profile '{session.profile_name}' in region {args.region}")
+    print(f"Using AWS profile '{session.profile_name}' in region {args.region}, voice '{args.voice}'")
     nova_client = SimpleNovaSonic(
         session=session,
         model_id=args.model_id,

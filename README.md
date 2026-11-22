@@ -77,7 +77,8 @@ Options:
 | `--profile` | `$AWS_PROFILE` or `default` | AWS profile for credentials |
 | `--region` | `$AWS_REGION` or `us-east-1` | Bedrock region |
 | `--model-id` | `amazon.nova-2-sonic-v1:0` | Model ID |
-| `--voice` | `matthew` | Output voice (e.g. `matthew`, `tiffany`, `amy`) |
+| `--voice` | `tiffany` | Output voice (see below) |
+| `--list-voices` | | Print available voices and exit |
 | `--system-prompt` | built-in assistant prompt | System prompt text |
 
 Example:
@@ -86,14 +87,36 @@ Example:
 uv run nova_sonic_simple.py --voice tiffany --system-prompt "You are a friendly travel guide. Keep answers short."
 ```
 
+## Voices
+
+| Voice | Locale | Notes |
+| --- | --- | --- |
+| `matthew` | en-US | masculine, polyglot (speaks all supported languages) |
+| `tiffany` | en-US | feminine, polyglot (speaks all supported languages) |
+| `amy` | en-GB | feminine |
+| `olivia` | en-AU | feminine |
+| `kiara` | en-IN / hi-IN | feminine |
+| `arjun` | en-IN / hi-IN | masculine |
+| `ambre` / `florian` | fr-FR | feminine / masculine |
+| `beatrice` / `lorenzo` | it-IT | feminine / masculine |
+| `tina` / `lennart` | de-DE | feminine / masculine |
+| `lupe` / `carlos` | es-US | feminine / masculine |
+| `carolina` / `leo` | pt-BR | feminine / masculine |
+
+
 ## Audio format
 
 - Input: 16 kHz, 16-bit, mono LPCM (microphone)
 - Output: 24 kHz, 16-bit, mono LPCM (speakers)
 
+## Reference docs
+
+Offline copies of the Nova 2 Sonic documentation are in [docs/](docs/README.md).
+
 ## Troubleshooting
 
 - **`No AWS credentials found for profile`**: the profile name is wrong, or (for SSO) run `aws sso login --profile <name>`.
 - **`AccessDeniedException`**: model access isn't enabled for your account in that region, or the IAM policy lacks `bedrock:InvokeModelWithBidirectionalStream`.
+- **Ctrl+C** shuts down cleanly, same as Enter.
 - **No sound or wrong mic**: the default Windows input/output devices are used; change them in Windows Sound settings.
 - **Model interrupts itself**: use headphones to avoid echo.
