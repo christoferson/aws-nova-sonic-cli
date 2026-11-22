@@ -1,3 +1,10 @@
+"""Shared plumbing for every script: AWS client and credentials, audio format, voices, CLI options.
+
+Why a custom credentials resolver: the Bedrock bidirectional-streaming client comes from the
+experimental Smithy-based SDK (aws_sdk_bedrock_runtime), which only reads credentials from
+environment variables out of the box. Boto3CredentialsResolver plugs boto3's credential chain
+into it, so AWS profiles, SSO and assume-role work, with automatic refresh.
+"""
 import argparse
 import asyncio
 import os
@@ -17,6 +24,8 @@ sys.stdout.reconfigure(errors="replace")
 DEFAULT_MODEL_ID = "amazon.nova-2-sonic-v1:0"
 DEFAULT_VOICE = "tiffany"
 
+# Nova Sonic audio: 16-bit signed little-endian mono PCM ("LPCM"). Mic input at 16 kHz,
+# model speech at 24 kHz. paInt16 makes PyAudio record/play exactly that sample format.
 INPUT_SAMPLE_RATE = 16000
 OUTPUT_SAMPLE_RATE = 24000
 CHANNELS = 1
@@ -70,6 +79,9 @@ class Boto3CredentialsResolver(IdentityResolver[AWSCredentialsIdentity, AWSIdent
             )
 
     async def get_identity(self, *, properties: AWSIdentityProperties) -> AWSCredentialsIdentity:
+        """Called by the SDK whenever it signs a request; returns the current key/secret/token."""
+        # get_frozen_credentials() refreshes expiring temporary credentials (SSO, assume-role)
+        # and returns a consistent snapshot, so key and token always belong together.
         frozen = self._credentials.get_frozen_credentials()
         return AWSCredentialsIdentity(
             access_key_id=frozen.access_key,
@@ -79,6 +91,7 @@ class Boto3CredentialsResolver(IdentityResolver[AWSCredentialsIdentity, AWSIdent
 
 
 def create_bedrock_client(session, region):
+    """Bedrock Runtime client from the Smithy-based SDK (the one that supports bidirectional streams)."""
     config = Config(
         endpoint_uri=f"https://bedrock-runtime.{region}.amazonaws.com",
         region=region,

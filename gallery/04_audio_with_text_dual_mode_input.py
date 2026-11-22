@@ -1,4 +1,29 @@
-"""Step 4: dual-mode input. Speak or type (cross-modal input), plus chat history to resume conversations."""
+"""Step 4: dual-mode input. Speak or type (cross-modal input), plus chat history to resume conversations.
+
+Run:  uv run gallery/04_audio_with_text_dual_mode_input.py --history chat.json
+      --mode mixed|text|audio   speak and/or type (default mixed)
+      --tools                   also enable the step 03 tools (off by default)
+      --no-save                 load --history without writing to it
+
+Cross-modal input
+-----------------
+A typed message is just another USER content block, sent while audio keeps streaming:
+    contentStart (type TEXT, role USER, interactive true) -> textInput -> contentEnd
+The model answers it out loud exactly as if you had said it. Use a new contentName per message.
+
+The session still needs continuous audio input, even if you only type. Without it the
+connection times out, so --mode text streams silence instead of the microphone.
+
+Chat history
+------------
+Earlier turns can be replayed once, right after the system prompt and before audio starts,
+as TEXT blocks with role USER or ASSISTANT (interactive true). They must alternate
+USER/ASSISTANT, each message must be under 50 KB, and all of them together under 200 KB.
+
+To build that history we record the conversation as it happens: your speech-recognition text,
+your typed messages, and the assistant's FINAL text (what it actually said, not the SPECULATIVE
+preview). On exit it is appended to the --history file, so the next run can resume.
+"""
 import asyncio
 import importlib
 import json
@@ -25,6 +50,8 @@ MAX_MESSAGE_BYTES = 50_000
 HISTORY_ROLES = ("USER", "ASSISTANT")
 QUIT_COMMANDS = ("/quit", "/exit", "quit", "exit")
 
+# Replayed history looks like earlier turns of *this* conversation, so without this hint the model
+# insists it "doesn't remember previous conversations" when asked about them.
 HISTORY_PROMPT_SUFFIX = (
     " The conversation so far includes messages from your earlier conversations with this user. "
     "Treat them as things you remember, and use them when the user refers to past conversations."
@@ -52,8 +79,11 @@ def read_history_file(path):
 
 def history_for_model(messages):
     """Newest messages that fit Nova Sonic's size limits; the file itself keeps everything."""
+    # Walk backwards from the newest message so the oldest ones are dropped first.
     kept, total = [], 0
     for message in reversed(messages):
+        # Limits are in bytes, not characters (Japanese text is 3 bytes per character in UTF-8).
+        # Cut at the byte limit; "ignore" drops a character split in half by the cut.
         content = message["content"].encode("utf-8")[:MAX_MESSAGE_BYTES].decode("utf-8", "ignore")
         total += len(content.encode("utf-8"))
         if total > MAX_HISTORY_BYTES:
@@ -66,7 +96,9 @@ def history_for_model(messages):
 
 
 def append_message(messages, role, text):
+    """Add text to a message list, merging it into the last message if the role is the same."""
     # History must alternate USER/ASSISTANT, so merge consecutive messages from the same role.
+    # This also joins the sentence-by-sentence transcript pieces into one message per turn.
     if messages and messages[-1]["role"] == role:
         messages[-1]["content"] += " " + text
     else:
@@ -74,7 +106,11 @@ def append_message(messages, role, text):
 
 
 class TextStreamManager(ToolUseStreamManager):
-    """Adds typed (cross-modal) input, chat history replay, and transcript recording."""
+    """Adds typed (cross-modal) input, chat history replay, and transcript recording.
+
+    Inherits barge-in from step 02 and tool handling from step 03; tools are switched off unless
+    tools_enabled, by sending an empty tool list.
+    """
 
     def __init__(self, *args, history=None, tools_enabled=False, **kwargs):
         super().__init__(*args, **kwargs)
@@ -86,7 +122,9 @@ class TextStreamManager(ToolUseStreamManager):
         if self.history:
             # Without this the model tends to insist it has no memory of earlier sessions.
             self.system_prompt += HISTORY_PROMPT_SUFFIX
-        self.transcript = []
+        self.transcript = []  # this session's messages, appended to the history file on exit
+        # Role and generation stage of the block being received, tracked separately from the
+        # base class so recording doesn't depend on its printing logic.
         self._transcript_role = None
         self._transcript_stage = None
 
@@ -94,12 +132,14 @@ class TextStreamManager(ToolUseStreamManager):
         return super().tool_configuration() if self.tools_enabled else {"tools": []}
 
     async def initialize_stream(self):
+        """Run the normal setup (step 02), then replay the chat history."""
         await super().initialize_stream()
         # History is allowed once, after the system prompt and before audio streaming starts.
         for message in self.history:
             await self._send_text_block(message["role"], message["content"], interactive=True)
 
     async def _send_text_block(self, role, text, interactive):
+        """Send one TEXT content block (contentStart, textInput, contentEnd) with a fresh contentName."""
         content_name = str(uuid.uuid4())
         await self.send_event({
             "contentStart": {
@@ -117,11 +157,13 @@ class TextStreamManager(ToolUseStreamManager):
         await self.send_event({"contentEnd": {"promptName": self.prompt_name, "contentName": content_name}})
 
     async def send_user_text(self, text):
+        """Send a typed message (the model replies out loud) and record it for the history file."""
         await self._send_text_block("USER", text, interactive=True)
         append_message(self.transcript, "USER", text)
         debug_print(f"Sent typed text: {text}")
 
     async def on_event(self, event_type, event):
+        """Keep step 03's tool handling, and record transcript text for the history file."""
         await super().on_event(event_type, event)
         if event_type == "contentStart":
             content_start = event["contentStart"]
@@ -141,6 +183,9 @@ class TextStreamManager(ToolUseStreamManager):
 
 def start_line_reader(loop):
     """Read stdin lines on a daemon thread into an asyncio queue; None marks EOF."""
+    # input() blocks, and there's no portable async stdin on Windows, so a thread reads lines and
+    # hands them to the event loop with call_soon_threadsafe. Daemon: it won't keep the program
+    # alive at exit while still waiting for a line.
     lines = asyncio.Queue()
 
     def worker():
@@ -157,6 +202,7 @@ def start_line_reader(loop):
 
 
 def make_text_loop(stream_manager, mode):
+    """Build the stop condition for run_conversation(): send typed lines until /quit or EOF."""
     async def text_loop():
         if mode == "mixed":
             print("Speak into your microphone, or type a message and press Enter.")
@@ -179,6 +225,7 @@ def make_text_loop(stream_manager, mode):
 
 
 def save_history(path, history, transcript):
+    """Write the full loaded history plus this session's transcript; skip if nothing new was said."""
     if not transcript:
         print(f"Nothing new to save; {path} left unchanged")
         return
@@ -243,6 +290,7 @@ async def main():
         region=args.region,
         voice_id=args.voice,
         system_prompt=args.system_prompt,
+        # The model gets the newest messages that fit; `history` (all of it) is what gets saved.
         history=history_for_model(history),
         tools_enabled=args.tools,
     )

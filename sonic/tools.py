@@ -1,3 +1,12 @@
+"""Tools the model can call, plus their JSON-schema definitions.
+
+Each entry in TOOLS has an async handler, a description (the model reads it to decide when to
+call the tool) and a JSON schema for the arguments. tool_specs() turns them into the toolSpec
+format promptStart expects; run_tool() executes one and always returns a dict, using
+{"error": ...} for failures so the model always gets a result.
+
+To add a tool: write an async function returning a JSON-serializable dict, then add an entry.
+"""
 import ast
 import asyncio
 import datetime
@@ -100,9 +109,11 @@ def _fetch_weather(location, units):
 
 
 async def get_weather(location, units="celsius"):
+    """City name -> coordinates (Open-Meteo geocoding) -> current weather and 3-day forecast."""
     if units not in ("celsius", "fahrenheit"):
         units = "celsius"
     try:
+        # urllib is blocking; to_thread runs it in a worker thread so the conversation keeps going.
         return await asyncio.to_thread(_fetch_weather, location, units)
     except OSError as e:
         return {"error": f"Weather service unavailable: {e}"}
@@ -127,6 +138,12 @@ MAX_RESULT_BITS = 4096
 
 
 def _evaluate(node):
+    """Evaluate a parsed expression tree, allowing only whitelisted node types.
+
+    The expression comes from the model (ultimately from what a user said), so eval() would let
+    it run arbitrary code. ast.parse() only builds a syntax tree; we walk it ourselves and reject
+    anything that isn't a number, a constant, an arithmetic operator, or a listed math function.
+    """
     if isinstance(node, ast.Expression):
         return _evaluate(node.body)
     if isinstance(node, ast.Constant) and type(node.value) in (int, float):
