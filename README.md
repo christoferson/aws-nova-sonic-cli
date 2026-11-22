@@ -2,7 +2,13 @@
 
 Console speech-to-speech AI agent using [Amazon Nova 2 Sonic](https://aws.amazon.com/blogs/aws/introducing-amazon-nova-2-sonic-next-generation-speech-to-speech-model-for-conversational-ai/) on Amazon Bedrock. You speak into your microphone, the model answers out loud, and both transcripts are printed in the terminal.
 
-Based on the AWS sample [`nova_sonic_simple.py`](https://github.com/aws-samples/amazon-ai-samples/blob/main/speech-to-speech/amazon-nova-2-sonic/sample-codes/console-python/nova_sonic_simple.py).
+Based on the AWS [console-python samples](https://github.com/aws-samples/amazon-ai-samples/tree/main/speech-to-speech/amazon-nova-2-sonic/sample-codes/console-python):
+
+| Script | What it shows |
+| --- | --- |
+| `nova_sonic_simple.py` | Minimal speech-to-speech loop: mic in, voice out, transcripts printed |
+| `nova_sonic.py` | Full version with **barge-in** (interrupt the assistant mid-answer), callback-based mic capture, auto-exit when the server ends the session, and `--debug` event logging |
+| `sonic_common.py` | Shared code: AWS profile credentials, CLI options, voices, Enter/Ctrl+C handling |
 
 ## Prerequisites
 
@@ -65,12 +71,16 @@ $env:AWS_REGION="us-east-1"
 ## Run
 
 ```bash
-uv run nova_sonic_simple.py
+uv run nova_sonic_simple.py   # simple
+uv run nova_sonic.py          # with barge-in
+uv run nova_sonic.py --debug  # with event-level logging
 ```
 
-Then start talking. Press **Enter** to end the session.
+Then start talking. Press **Enter** (or Ctrl+C) to end the session.
 
-Options:
+With `nova_sonic.py` you can start speaking while the assistant is talking: it stops immediately, prints `(interrupted)`, and answers your new input. Use headphones so it doesn't interrupt itself.
+
+Options (both scripts):
 
 | Flag | Default | Description |
 | --- | --- | --- |
@@ -80,11 +90,12 @@ Options:
 | `--voice` | `tiffany` | Output voice (see below) |
 | `--list-voices` | | Print available voices and exit |
 | `--system-prompt` | built-in assistant prompt | System prompt text |
+| `--debug` | off | `nova_sonic.py` only: log events, stop reasons, token usage |
 
 Example:
 
 ```bash
-uv run nova_sonic_simple.py --voice tiffany --system-prompt "You are a friendly travel guide. Keep answers short."
+uv run nova_sonic.py --voice matthew --system-prompt "You are a friendly travel guide. Keep answers short."
 ```
 
 ## Voices
