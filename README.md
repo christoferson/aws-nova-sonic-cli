@@ -18,6 +18,7 @@ gallery/                                   Feature showcases, in order of diffic
   07_audio_with_assistant_speaks_first.py  Builds on 02: the assistant greets you as soon as it connects
   08_audio_with_usage_tracking.py          Builds on 02: tokens and estimated cost per reply and per session
   09_audio_with_knowledge_base.py          Builds on 03: answers from local documents via a search tool (RAG)
+  10_audio_with_forced_tool_use.py         Builds on 09: choose whether the model may or must call a tool first
 sonic/                                     Shared package (installed into the venv by uv sync)
   common.py                                AWS profile credentials, CLI options, voices, default prompt
   tools.py                                 Tool implementations and JSON schemas
@@ -106,6 +107,7 @@ uv run gallery/06_audio_with_session_continuation.py --switch-after 30
 uv run gallery/07_audio_with_assistant_speaks_first.py
 uv run gallery/08_audio_with_usage_tracking.py
 uv run gallery/09_audio_with_knowledge_base.py
+uv run gallery/10_audio_with_forced_tool_use.py --tool-choice auto
 ```
 
 Then start talking. Press **Enter** (or Ctrl+C) to end the session.
@@ -241,6 +243,21 @@ uv run gallery/09_audio_with_knowledge_base.py --kb-dir path/to/notes --kb-topic
 ```
 
 The search is BM25 keyword ranking, implemented in the script with no extra services. It matches words rather than meaning. For semantic search over large document sets, swap `KnowledgeBase.search` for Amazon Bedrock Knowledge Bases (the `bedrock-agent-runtime` Retrieve API).
+
+## Forced tool use
+
+`gallery/10_audio_with_forced_tool_use.py` adds the date/time tool to step 09's docs search and sets `toolChoice`, which decides whether the model may or must call a tool before answering:
+
+| `--tool-choice` | Behavior |
+| --- | --- |
+| `search_knowledge_base` (default) | Always searches the docs first, so answers can't come from memory |
+| `get_date_and_time` | Always checks the time first |
+| `any` | Always calls one of the tools first; the model picks which |
+| `auto` | The model decides, as in steps 03 and 09 |
+
+Forcing the search makes the model *look* in the docs, but it can still add general knowledge or answer off-topic questions. Add `--strict` to allow answers only from the documentation. The assistant then says when something isn't covered and declines unrelated questions; the date and time still work. Test it with something off-topic ("who won the World Cup?") and something the docs don't cover.
+
+After each reply it prints which tools were used, for example `[choice] reply 3 (auto): no tool`. Ask the same questions in different modes to compare them. Forcing a tool makes every reply wait for it, even "hello" (which triggers a search for "hello").
 
 ## Voices
 
