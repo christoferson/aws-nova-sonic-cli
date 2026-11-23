@@ -7,19 +7,20 @@ Based on the AWS [console-python samples](https://github.com/aws-samples/amazon-
 ## Project layout
 
 ```
-nova_sonic.py                            Main program: voice assistant with barge-in and tools
-gallery/                                 Feature showcases, in order of difficulty
-  01_audio_plain.py                      Mic in, voice out, transcripts; the whole event protocol in one file
-  02_audio_with_barge_in.py              Interrupt the assistant mid-answer; --debug event logging
-  03_audio_with_tools.py                 Builds on 02: the model calls Python tools and speaks the results
-  04_audio_with_text_dual_mode_input.py  Builds on 03: speak or type, chat history; tools off unless --tools
-  05_audio_with_turn_taking.py           Builds on 02: set how long a pause ends your turn, and time each reply
-  06_audio_with_session_continuation.py  Builds on 02: keep talking past the 8-minute limit by switching sessions
-sonic/                                   Shared package (installed into the venv by uv sync)
-  common.py                              AWS profile credentials, CLI options, voices, default prompt
-  tools.py                               Tool implementations and JSON schemas
-examples/chat_history.json               Sample history for 04
-docs/                                    Offline copies of the Nova 2 Sonic docs
+nova_sonic.py                              Main program: voice assistant with barge-in and tools
+gallery/                                   Feature showcases, in order of difficulty
+  01_audio_plain.py                        Mic in, voice out, transcripts; the whole event protocol in one file
+  02_audio_with_barge_in.py                Interrupt the assistant mid-answer; --debug event logging
+  03_audio_with_tools.py                   Builds on 02: the model calls Python tools and speaks the results
+  04_audio_with_text_dual_mode_input.py    Builds on 03: speak or type, chat history; tools off unless --tools
+  05_audio_with_turn_taking.py             Builds on 02: set how long a pause ends your turn, and time each reply
+  06_audio_with_session_continuation.py    Builds on 02: keep talking past the 8-minute limit by switching sessions
+  07_audio_with_assistant_speaks_first.py  Builds on 02: the assistant greets you as soon as it connects
+sonic/                                     Shared package (installed into the venv by uv sync)
+  common.py                                AWS profile credentials, CLI options, voices, default prompt
+  tools.py                                 Tool implementations and JSON schemas
+examples/chat_history.json                 Sample history for 04
+docs/                                      Offline copies of the Nova 2 Sonic docs
 ```
 
 `nova_sonic.py` is standalone, so it can evolve without breaking the gallery. Each gallery step builds on the previous one, so reading them in order is a guided tour of the API.
@@ -100,6 +101,7 @@ uv run gallery/03_audio_with_tools.py
 uv run gallery/04_audio_with_text_dual_mode_input.py
 uv run gallery/05_audio_with_turn_taking.py --sensitivity HIGH
 uv run gallery/06_audio_with_session_continuation.py --switch-after 30
+uv run gallery/07_audio_with_assistant_speaks_first.py
 ```
 
 Then start talking. Press **Enter** (or Ctrl+C) to end the session.
@@ -190,6 +192,16 @@ Nova Sonic cuts every connection after about 8 minutes. `gallery/06_audio_with_s
 4. It closes the old session in the background.
 
 You'll see `[session] session 2 active: 6 history messages, 1.5s of audio replayed`. Use `--switch-after 30` to watch it switch every half minute. Then ask "what did I say earlier?" after a switch to check the context carried over.
+
+## Assistant speaks first
+
+`gallery/07_audio_with_assistant_speaks_first.py` makes the assistant open the conversation, the way a phone agent answers a call. Right after the audio stream starts, it sends a hidden typed instruction ("the user just joined, greet them"). The model answers it out loud. The greeting follows the system prompt, so a persona changes how it greets:
+
+```bash
+uv run gallery/07_audio_with_assistant_speaks_first.py --system-prompt "You are Sunny, the receptionist at Kyoto Ramen. Greet callers, take reservations, keep answers short."
+```
+
+`--greeting-instruction` replaces the hidden instruction itself. It prints `[greeting] assistant started speaking 0.9s after connecting` (time to first audio).
 
 ## Voices
 
