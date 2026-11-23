@@ -14,6 +14,7 @@ gallery/                                 Feature showcases, in order of difficul
   03_audio_with_tools.py                 Builds on 02: the model calls Python tools and speaks the results
   04_audio_with_text_dual_mode_input.py  Builds on 03: speak or type, chat history; tools off unless --tools
   05_audio_with_turn_taking.py           Builds on 02: set how long a pause ends your turn, and time each reply
+  06_audio_with_session_continuation.py  Builds on 02: keep talking past the 8-minute limit by switching sessions
 sonic/                                   Shared package (installed into the venv by uv sync)
   common.py                              AWS profile credentials, CLI options, voices, default prompt
   tools.py                               Tool implementations and JSON schemas
@@ -98,6 +99,7 @@ uv run gallery/02_audio_with_barge_in.py
 uv run gallery/03_audio_with_tools.py
 uv run gallery/04_audio_with_text_dual_mode_input.py
 uv run gallery/05_audio_with_turn_taking.py --sensitivity HIGH
+uv run gallery/06_audio_with_session_continuation.py --switch-after 30
 ```
 
 Then start talking. Press **Enter** (or Ctrl+C) to end the session.
@@ -177,6 +179,17 @@ If you see `(interrupted)` after most answers when you didn't interrupt, the mic
 | `LOW` | ~2.0 s | People who pause to think |
 
 After each reply starts, it prints `[turn] reply started 1.9s after you stopped speaking`. That time is the pause plus model and network latency. It's estimated from mic loudness, so use headphones in a quiet room. If background noise skews it, raise `SPEECH_RMS_THRESHOLD` in the script.
+
+## Long conversations (session continuation)
+
+Nova Sonic cuts every connection after about 8 minutes. `gallery/06_audio_with_session_continuation.py` keeps one conversation going by moving it to a fresh session before then:
+
+1. After `--switch-after` seconds (default 360), it waits for a quiet moment: the reply has finished and played, and nobody is speaking. If there's no quiet moment before 7:30, it switches anyway.
+2. It opens a new session and replays the conversation so far as chat history.
+3. It hands the microphone over. Audio from the last 1.5 s and from during the switch is replayed to the new session, so nothing you say is lost.
+4. It closes the old session in the background.
+
+You'll see `[session] session 2 active: 6 history messages, 1.5s of audio replayed`. Use `--switch-after 30` to watch it switch every half minute. Then ask "what did I say earlier?" after a switch to check the context carried over.
 
 ## Voices
 
