@@ -11,9 +11,9 @@ gallery/           Numbered feature showcases, simplest first
   02_audio_with_barge_in.py              Core classes every later step builds on
   03_audio_with_tools.py                 Tool use (builds on 02)
   04_audio_with_text_dual_mode_input.py  Typed input + chat history (builds on 03)
-  05..11_*.py                            One feature each: turn-taking, session continuation,
+  05..12_*.py                            One feature each: turn-taking, session continuation,
                                          assistant speaks first, usage/cost, knowledge base,
-                                         forced tool use, 8 kHz audio
+                                         forced tool use, 8 kHz audio, multi-step tool workflow
 sonic/             Shared package, installed into the venv by uv sync
   common.py        Credentials, Bedrock client, audio format, voices, default prompt, CLI options
   tools.py         Tool registry: handlers, descriptions, JSON schemas

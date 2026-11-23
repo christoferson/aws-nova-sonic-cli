@@ -20,6 +20,7 @@ gallery/                                   Feature showcases, in order of diffic
   09_audio_with_knowledge_base.py          Builds on 03: answers from local documents via a search tool (RAG)
   10_audio_with_forced_tool_use.py         Builds on 09: choose whether the model may or must call a tool first
   11_audio_with_phone_quality.py           Builds on 02: 8 kHz audio both ways, like a phone call
+  12_audio_with_multi_step_tools.py        Builds on 03: a returns agent that chains lookup, check and action tools
 sonic/                                     Shared package (installed into the venv by uv sync)
   common.py                                AWS profile credentials, CLI options, voices, default prompt
   tools.py                                 Tool implementations and JSON schemas
@@ -110,6 +111,7 @@ uv run gallery/08_audio_with_usage_tracking.py
 uv run gallery/09_audio_with_knowledge_base.py
 uv run gallery/10_audio_with_forced_tool_use.py --tool-choice auto
 uv run gallery/11_audio_with_phone_quality.py
+uv run gallery/12_audio_with_multi_step_tools.py
 ```
 
 Then start talking. Press **Enter** (or Ctrl+C) to end the session.
@@ -271,6 +273,21 @@ After each reply it prints which tools were used, for example `[choice] reply 3 
 `gallery/11_audio_with_phone_quality.py` runs both your microphone and the assistant's voice at 8 kHz, the sample rate phone networks use. You hear what a caller would hear (muffled, since only frequencies up to 4 kHz survive), and the model hears you the way it would over a phone line. Nova 2 Sonic's speech recognition was improved specifically for 8 kHz telephony audio. Compare with `--rate 16000` (or `24000`).
 
 A real phone agent gets its audio from a provider such as Amazon Connect, Twilio or Vonage, usually as 8 kHz mu-law that is converted to 16-bit PCM first. This step skips the phone network and just records and plays at 8 kHz.
+
+## Multi-step tool workflow
+
+`gallery/12_audio_with_multi_step_tools.py` is a returns assistant for a made-up store, Nova Outfitters. A return needs three tools in order: `lookup_order`, then `check_return_eligibility`, then `create_return`. The model chains them across the conversation and asks you to confirm before it creates the return. This is the kind of agentic workflow Nova 2.5 Sonic's improved reasoning and tool calling target.
+
+| Order | Try saying | What happens |
+| --- | --- | --- |
+| 1001 | "I'd like to return the socks from order 1001." | Eligible: it states the refund, asks you to confirm, then creates the return |
+| 1002 | "Can I return my rain jacket? Order 1002." | Declined: past the 30-day window |
+| 1003 | "Return the lantern from order 1003." | Declined: final-sale item (the water bottle in the same order is returnable) |
+| 1004 | "Where is order 1004?" | Shipped but not delivered, so not returnable yet |
+
+Each step is printed as `[tool] name(args)`. The data is in memory, so returns you create last until the program exits. `create_return` checks eligibility again itself, so it can't create a return that shouldn't exist even if the model skips a step.
+
+Compare with Nova 2 Sonic using `--model-id amazon.nova-2-sonic-v1:0`. In testing, both completed the workflow, but 2.0 gave longer answers and once said it would process the return without calling `create_return`.
 
 ## Voices
 
