@@ -50,6 +50,11 @@ ToolUseStreamManager = tool_use.ToolUseStreamManager
 
 DEFAULT_KB_DIR = pathlib.Path(__file__).resolve().parent.parent / "docs" / "nova-2-sonic"
 DEFAULT_KB_TOPIC = "Amazon Nova 2 Sonic (the speech-to-speech model this app uses)"
+# Shown to the user at startup, so they know what to ask.
+DEFAULT_KB_SUMMARY = (
+    "I can answer questions about Amazon Nova 2 Sonic: how it works, voices and languages, "
+    "interrupting, turn-taking, tool use, chat history, and integrations."
+)
 TOOL_NAME = "search_knowledge_base"
 
 PASSAGE_MAX_CHARS = 900  # paragraphs are grouped into passages up to about this size
@@ -107,32 +112,22 @@ class KnowledgeBase:
     def __init__(self, folder):
         self.folder = pathlib.Path(folder)
         self.passages = []
-        self.documents = []  # one entry per indexed file, for the startup listing
         for path in sorted(self.folder.rglob("*")):
             if path.suffix.lower() not in (".md", ".txt") or not path.is_file():
                 continue
             text = path.read_text(encoding="utf-8", errors="replace")
-            source = path.relative_to(self.folder).as_posix()
             url = re.match(r"Source: (\S+)", text)
-            heading = re.search(r"^#\s+(.+)$", text, re.MULTILINE)
-            passages_before = len(self.passages)
             for section, passage in split_into_passages(text):
                 tokens = tokenize(f"{section} {passage}")
                 if tokens:
                     self.passages.append({
-                        "source": source,
+                        "source": path.relative_to(self.folder).as_posix(),
                         "url": url.group(1) if url else None,
                         "section": section,
                         "text": passage,
                         "term_counts": collections.Counter(tokens),
                         "length": len(tokens),
                     })
-            self.documents.append({
-                "source": source,
-                "title": heading.group(1).strip() if heading else path.stem,
-                "url": url.group(1) if url else None,
-                "passages": len(self.passages) - passages_before,
-            })
         # How many passages contain each word; rare words are worth more.
         self.passages_with_term = collections.Counter()
         for passage in self.passages:
@@ -223,23 +218,12 @@ class KnowledgeBaseStreamManager(ToolUseStreamManager):
         }
 
 
-def print_knowledge_base(knowledge_base, topic, max_listed=25, max_title=50):
-    """Show what the assistant can answer from: topic, folder, and each indexed document."""
-    docs = knowledge_base.documents
-    try:
-        folder = knowledge_base.folder.resolve().relative_to(pathlib.Path.cwd())
-    except ValueError:
-        folder = knowledge_base.folder
-    print(f"Knowledge base: {topic}")
-    print(f"  Source: {folder} (local files, indexed in memory; no internet lookups)")
-    print(f"  {len(docs)} documents, {len(knowledge_base.passages)} searchable passages:")
-    titles = [d["title"] if len(d["title"]) <= max_title else d["title"][:max_title - 3] + "..." for d in docs]
-    width = max(len(t) for t in titles[:max_listed])
-    for title, doc in zip(titles[:max_listed], docs):
-        count = f"{doc['passages']} passage" + ("" if doc["passages"] == 1 else "s")
-        print(f"    {title:<{width}}  {count:>12}  {doc['source']}")
-    if len(docs) > max_listed:
-        print(f"    ... and {len(docs) - max_listed} more")
+def print_knowledge_base(kb_dir, topic):
+    """Tell the user what the assistant can answer questions about."""
+    if pathlib.Path(kb_dir).resolve() == DEFAULT_KB_DIR:
+        print(DEFAULT_KB_SUMMARY)
+    else:
+        print(f"I can answer questions about {topic}.")
 
 
 async def main():
@@ -266,7 +250,7 @@ async def main():
     knowledge_base = KnowledgeBase(args.kb_dir)
     if not knowledge_base.passages:
         parser.error(f"no .md or .txt content found in {args.kb_dir}")
-    print_knowledge_base(knowledge_base, args.kb_topic)
+    print_knowledge_base(args.kb_dir, args.kb_topic)
 
     session = boto3.Session(profile_name=args.profile)
     print(f"Using AWS profile '{session.profile_name}' in region {args.region}, voice '{args.voice}'")
