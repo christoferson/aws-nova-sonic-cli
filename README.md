@@ -17,6 +17,7 @@ gallery/                                   Feature showcases, in order of diffic
   06_audio_with_session_continuation.py    Builds on 02: keep talking past the 8-minute limit by switching sessions
   07_audio_with_assistant_speaks_first.py  Builds on 02: the assistant greets you as soon as it connects
   08_audio_with_usage_tracking.py          Builds on 02: tokens and estimated cost per reply and per session
+  09_audio_with_knowledge_base.py          Builds on 03: answers from local documents via a search tool (RAG)
 sonic/                                     Shared package (installed into the venv by uv sync)
   common.py                                AWS profile credentials, CLI options, voices, default prompt
   tools.py                                 Tool implementations and JSON schemas
@@ -104,6 +105,7 @@ uv run gallery/05_audio_with_turn_taking.py --sensitivity HIGH
 uv run gallery/06_audio_with_session_continuation.py --switch-after 30
 uv run gallery/07_audio_with_assistant_speaks_first.py
 uv run gallery/08_audio_with_usage_tracking.py
+uv run gallery/09_audio_with_knowledge_base.py
 ```
 
 Then start talking. Press **Enter** (or Ctrl+C) to end the session.
@@ -221,6 +223,24 @@ On exit, it prints a breakdown by token type, the total, and the cost per minute
 | Output speech (assistant voice) | 0.012 |
 | Input text (prompt, history, typed text, tool results) | 0.00033 |
 | Output text | 0.00275 |
+
+## Knowledge base (RAG)
+
+`gallery/09_audio_with_knowledge_base.py` gives the model one tool, `search_knowledge_base`. At startup it indexes every `.md`/`.txt` file in a folder, by default the saved Nova 2 Sonic docs in `docs/nova-2-sonic`, so you can ask the assistant about Nova Sonic itself:
+
+- "How long can a Nova Sonic connection stay open?"
+- "What does endpointing sensitivity do?"
+- "How should a client handle barge-in?"
+
+Each search prints the passages it found, for example `[kb] 'connection time limit' -> sonic-getting-started.md (Getting started ...)`. The model answers from them and says so when they don't contain the answer.
+
+Point it at your own documents:
+
+```bash
+uv run gallery/09_audio_with_knowledge_base.py --kb-dir path/to/notes --kb-topic "my team's runbooks"
+```
+
+The search is BM25 keyword ranking, implemented in the script with no extra services. It matches words rather than meaning. For semantic search over large document sets, swap `KnowledgeBase.search` for Amazon Bedrock Knowledge Bases (the `bedrock-agent-runtime` Retrieve API).
 
 ## Voices
 

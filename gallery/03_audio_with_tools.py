@@ -101,14 +101,18 @@ class ToolUseStreamManager(BedrockStreamManager):
         print(f"[tool] {name}({json.dumps(arguments, ensure_ascii=False)})")
         start = time.perf_counter()
         if result is None:
-            # run_tool never raises: unknown tools, bad arguments and exceptions become {"error": ...}.
-            result = await run_tool(name, arguments)
+            result = await self.execute_tool(name, arguments)
         status = "error" if "error" in result else "ok"
         print(f"[tool] {name} -> {status} in {time.perf_counter() - start:.1f}s")
         debug_print(f"tool result: {json.dumps(result, ensure_ascii=False)}")
 
         # The model waits for a result after every toolUse, so always send one, even on error.
         await self._send_tool_result(tool_use_id, result)
+
+    async def execute_tool(self, name, arguments):
+        """Run one tool and return a JSON-serializable dict. Override to provide other tools (step 09)."""
+        # run_tool never raises: unknown tools, bad arguments and exceptions become {"error": ...}.
+        return await run_tool(name, arguments)
 
     async def _send_tool_result(self, tool_use_id, result):
         """Send the result as a TOOL content block; toolUseId tells the model which call it answers."""
