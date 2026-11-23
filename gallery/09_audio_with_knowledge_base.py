@@ -17,6 +17,22 @@ search tool and tell it to use it (this is tool use from step 03 with a single t
     3. We return the 3 best passages with their file and section.
     4. The model answers from those passages, out loud.
 
+Where the index lives
+---------------------
+Not in the model's context: the documents are never put in the prompt as a whole. The index is a
+plain Python object in this process's memory, rebuilt at every start (milliseconds for a few
+hundred passages) and never written to disk. For each passage it stores word counts and length,
+plus how many passages contain each word. The model only ever sees the 3 passages a search
+returns (each cut to RESULT_MAX_CHARS), as the tool result.
+
+Why not paste all the docs into the system prompt instead? Every reply would pay input tokens for
+all of it, it stops fitting as the documents grow, and the model answers more reliably from a
+few relevant passages than from everything at once.
+
+    startup:  files -> split_into_passages -> tokenize -> KnowledgeBase (word statistics)
+    question: model calls search_knowledge_base("keywords") -> KnowledgeBase.search (BM25 score
+              every passage) -> top 3 passages -> tool result -> model answers from them
+
 The search is BM25, the classic keyword-ranking formula behind most search engines: a passage
 scores higher when it contains the query's words, especially rare words, and is not too long.
 It needs no extra services or packages. It matches words, not meaning, so the tool description

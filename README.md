@@ -242,6 +242,11 @@ Point it at your own documents:
 uv run gallery/09_audio_with_knowledge_base.py --kb-dir path/to/notes --kb-topic "my team's runbooks"
 ```
 
+How the index works:
+- **At startup:** the files are split into passages of a few paragraphs, and word statistics are kept in memory. Nothing is written to disk, and the index is rebuilt on every run.
+- **When you ask:** the model calls the search tool with keywords. Every passage is scored and the best 3 are returned as the tool result.
+- **What the model sees:** only those 3 passages. The documents are never pasted into its prompt as a whole, which would cost tokens on every reply and stop fitting as they grow.
+
 The search is BM25 keyword ranking, implemented in the script with no extra services. It matches words rather than meaning. For semantic search over large document sets, swap `KnowledgeBase.search` for Amazon Bedrock Knowledge Bases (the `bedrock-agent-runtime` Retrieve API).
 
 ## Forced tool use
