@@ -16,6 +16,7 @@ gallery/                                   Feature showcases, in order of diffic
   05_audio_with_turn_taking.py             Builds on 02: set how long a pause ends your turn, and time each reply
   06_audio_with_session_continuation.py    Builds on 02: keep talking past the 8-minute limit by switching sessions
   07_audio_with_assistant_speaks_first.py  Builds on 02: the assistant greets you as soon as it connects
+  08_audio_with_usage_tracking.py          Builds on 02: tokens and estimated cost per reply and per session
 sonic/                                     Shared package (installed into the venv by uv sync)
   common.py                                AWS profile credentials, CLI options, voices, default prompt
   tools.py                                 Tool implementations and JSON schemas
@@ -102,6 +103,7 @@ uv run gallery/04_audio_with_text_dual_mode_input.py
 uv run gallery/05_audio_with_turn_taking.py --sensitivity HIGH
 uv run gallery/06_audio_with_session_continuation.py --switch-after 30
 uv run gallery/07_audio_with_assistant_speaks_first.py
+uv run gallery/08_audio_with_usage_tracking.py
 ```
 
 Then start talking. Press **Enter** (or Ctrl+C) to end the session.
@@ -202,6 +204,23 @@ uv run gallery/07_audio_with_assistant_speaks_first.py --system-prompt "You are 
 ```
 
 `--greeting-instruction` replaces the hidden instruction itself. It prints `[greeting] assistant started speaking 0.9s after connecting` (time to first audio).
+
+## Usage and cost
+
+`gallery/08_audio_with_usage_tracking.py` reads the `usageEvent` token counts Nova Sonic sends during a session. After each spoken reply, it prints that reply's cost and the running total:
+
+```
+[usage] reply 2: in 310 speech / 12 text, out 455 speech / 61 text = $0.0065 | session $0.0158
+```
+
+On exit, it prints a breakdown by token type, the total, and the cost per minute. Estimates use the us-east-1 on-demand prices from the AWS Price List ("Nova Sonic 2.0", retrieved 2026-11-23), stored in `PRICE_PER_1K_TOKENS` in the script. Prices change, so check the [Bedrock pricing page](https://aws.amazon.com/bedrock/pricing/).
+
+| Tokens | USD per 1K |
+| --- | --- |
+| Input speech (your mic) | 0.003 |
+| Output speech (assistant voice) | 0.012 |
+| Input text (prompt, history, typed text, tool results) | 0.00033 |
+| Output text | 0.00275 |
 
 ## Voices
 
