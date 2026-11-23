@@ -33,7 +33,7 @@ docs/                                      Offline copies of the Nova 2 Sonic do
 
 - [uv](https://docs.astral.sh/uv/) (installs Python 3.12 for you if it's missing)
 - A microphone and speakers. **Use headphones**, otherwise the model can hear itself and interrupt its own answer.
-- An AWS account with access to the `amazon.nova-2-sonic-v1:0` model in Amazon Bedrock, in a region where it's available (default `us-east-1`).
+- An AWS account with access to the `amazon.nova-2-5-sonic` model (Nova 2.5 Sonic) in Amazon Bedrock, in a region where it's available (default `us-east-1`).
 - IAM permission `bedrock:InvokeModelWithBidirectionalStream`.
 
 ## Setup
@@ -122,7 +122,7 @@ Options (all scripts):
 | --- | --- | --- |
 | `--profile` | `$AWS_PROFILE` or `default` | AWS profile for credentials |
 | `--region` | `$AWS_REGION` or `us-east-1` | Bedrock region |
-| `--model-id` | `amazon.nova-2-sonic-v1:0` | Model ID |
+| `--model-id` | `amazon.nova-2-5-sonic` | Model ID. Use `amazon.nova-2-sonic-v1:0` to switch back to Nova 2 Sonic |
 | `--voice` | `tiffany` | Output voice (see below) |
 | `--list-voices` | | Print available voices and exit |
 | `--system-prompt` | voice assistant prompt | Replace the default prompt. The default tells the model it is speaking out loud, matches its gender to the voice, and has it reply in the language you speak |
@@ -294,9 +294,12 @@ A real phone agent gets its audio from a provider such as Amazon Connect, Twilio
 - Input: 16 kHz, 16-bit, mono LPCM (microphone)
 - Output: 24 kHz, 16-bit, mono LPCM (speakers)
 
-## Reference docs
+## References
 
-Offline copies of the Nova 2 Sonic documentation are in [docs/](docs/README.md).
+- [aws-nova-sonic-cli](https://github.com/christoferson/aws-nova-sonic-cli): this project, written against the raw bidirectional event protocol
+- [aws-nova-sonic-cli-strands](https://github.com/christoferson/aws-nova-sonic-cli-strands): the same assistant built with the Strands Agents `BidiAgent`
+- [Nova 2.5 Sonic model card](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-nova-2-5-sonic.html): model ID, regions, capabilities and quotas
+- Offline copies of the Nova 2 Sonic documentation are in [docs/](docs/README.md).
 
 ## Troubleshooting
 

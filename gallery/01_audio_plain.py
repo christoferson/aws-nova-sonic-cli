@@ -41,6 +41,9 @@ from aws_sdk_bedrock_runtime.models import (
 )
 
 from sonic.common import (
+    ASSISTANT_COLOR,
+    RESET_COLOR,
+    USER_COLOR,
     CHANNELS,
     DEFAULT_MODEL_ID,
     DEFAULT_VOICE,
@@ -243,9 +246,9 @@ class SimpleNovaSonic:
                     # Role USER: speech recognition of your voice. Role ASSISTANT: the reply text.
                     text = event["textOutput"]["content"]
                     if self.role == "ASSISTANT" and self.display_assistant_text:
-                        print(f"Assistant: {text}")
+                        print(f"{ASSISTANT_COLOR}Assistant: {text}{RESET_COLOR}")
                     elif self.role == "USER":
-                        print(f"User: {text}")
+                        print(f"{USER_COLOR}User: {text}{RESET_COLOR}")
 
                 elif "audioOutput" in event:
                     # Audio arrives faster than real time, so it is queued and played at its own pace.

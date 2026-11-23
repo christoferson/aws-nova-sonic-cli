@@ -53,7 +53,7 @@ examples/          Sample chat history for step 04
 ## Constraints
 - Python 3.12 via uv (`uv run ...`). Credentials come from the AWS profile through boto3
   (`Boto3CredentialsResolver`), never from hard-coded keys. Region us-east-1, model
-  `amazon.nova-2-sonic-v1:0`.
+  `amazon.nova-2-5-sonic` (Nova 2.5 Sonic; `amazon.nova-2-sonic-v1:0` via --model-id).
 - With tools, keep a tool hint in the system prompt ("Use them instead of guessing"); without it
   the model answers from memory instead of calling them.
 - The calculator parses with `ast` and a whitelist; never use eval().

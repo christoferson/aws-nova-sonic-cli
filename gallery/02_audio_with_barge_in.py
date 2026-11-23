@@ -44,6 +44,9 @@ from aws_sdk_bedrock_runtime.models import (
 )
 
 from sonic.common import (
+    ASSISTANT_COLOR,
+    RESET_COLOR,
+    USER_COLOR,
     CHANNELS,
     DEFAULT_MODEL_ID,
     DEFAULT_VOICE,
@@ -59,6 +62,9 @@ from sonic.common import (
 
 # Frames per audio buffer: 512 frames at 16 kHz = 32 ms. Smaller than step 01 for snappier barge-in.
 CHUNK_SIZE = 512
+
+# How long close() waits for the server to end the stream before giving up.
+CLOSE_TIMEOUT_SECONDS = 2
 
 # Set by --debug. Later steps set it through the module (barge_in.DEBUG = ...).
 DEBUG = False
@@ -273,9 +279,9 @@ class BedrockStreamManager:
                         print("(interrupted)")
                         self._handle_barge_in()
                     elif self.role == "ASSISTANT" and self.display_assistant_text:
-                        print(f"Assistant: {text}")
+                        print(f"{ASSISTANT_COLOR}Assistant: {text}{RESET_COLOR}")
                     elif self.role == "USER":
-                        print(f"User: {text}")
+                        print(f"{USER_COLOR}User: {text}{RESET_COLOR}")
 
                 elif event_type == "audioOutput":
                     await self.audio_output_queue.put(base64.b64decode(event["audioOutput"]["content"]))
@@ -318,12 +324,17 @@ class BedrockStreamManager:
             await self.send_event({"sessionEnd": {}})
             await self.stream.input_stream.close()
         except Exception as e:
-            debug_print(f"Error while closing stream: {e}")
+            print(f"Error while closing the session: {e}")
         finally:
             self.is_active = False
             if self.response_task and not self.response_task.done():
-                self.response_task.cancel()
-                await asyncio.gather(self.response_task, return_exceptions=True)
+                # Let the server end the stream first: cancelling a receive that is still waiting
+                # makes awscrt print a traceback when the server's last events arrive.
+                try:
+                    await asyncio.wait_for(asyncio.shield(self.response_task), CLOSE_TIMEOUT_SECONDS)
+                except asyncio.TimeoutError:
+                    self.response_task.cancel()
+                    await asyncio.gather(self.response_task, return_exceptions=True)
 
 
 class AudioStreamer:

@@ -21,7 +21,14 @@ from smithy_core.exceptions import SmithyIdentityError
 # Legacy console code pages (e.g. cp932) can't encode every character the model may output.
 sys.stdout.reconfigure(errors="replace")
 
-DEFAULT_MODEL_ID = "amazon.nova-2-sonic-v1:0"
+# Transcript colors (ANSI 256-color). os.system("") switches older Windows consoles into ANSI mode.
+os.system("")
+USER_COLOR = "\033[38;5;51m"  # neon cyan
+ASSISTANT_COLOR = "\033[38;5;201m"  # neon magenta
+RESET_COLOR = "\033[0m"
+
+# Nova 2 Sonic (amazon.nova-2-sonic-v1:0) still works via --model-id.
+DEFAULT_MODEL_ID = "amazon.nova-2-5-sonic"
 DEFAULT_VOICE = "tiffany"
 
 # Nova Sonic audio: 16-bit signed little-endian mono PCM ("LPCM"). Mic input at 16 kHz,
